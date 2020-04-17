@@ -77,28 +77,13 @@ public class MainActivity extends AppCompatActivity {
                          sManager.registerListener(mySensorEventListener, sManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER),SensorManager.SENSOR_DELAY_NORMAL);
                          sManager.registerListener(mySensorEventListener, sManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD),SensorManager.SENSOR_DELAY_NORMAL);
 
-                         //scanLeDevice();
-                         //advertise();
                          advertiser = BluetoothAdapter.getDefaultAdapter().getBluetoothLeAdvertiser();
-                         //adLoop();
                      }
                  });
              }
         });
 
     }
-
-    @RequiresApi(M)
-    void adLoop(){
-        advertise2(getUUIDString((int)azimuth, (int)pitch, (int)roll));
-        handler.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                adLoop();
-            }
-        }, 100);
-    }
-
 
     // Gravity rotational data
     private float gravity[];
@@ -194,72 +179,6 @@ public class MainActivity extends AppCompatActivity {
     private BluetoothAdapter bluetoothAdapter;
     private Handler handler;
 
-    private static final long SCAN_PERIOD = 10 * 60 * 1000;
-
-    @RequiresApi(M)
-    void scanLeDevice() {
-        bluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
-        bluetoothAdapter = bluetoothManager.getAdapter();
-
-
-        handler.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                bluetoothAdapter.stopLeScan(leScanCallback);
-            }
-        }, SCAN_PERIOD);
-
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Enter UUID to scan for (Cancel to scan for all)");
-
-
-        final EditText input = new EditText(this);
-        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        builder.setView(input);
-
-
-        builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                UUID[] uuids =  new UUID[]{UUID.fromString(input.getText().toString())};//new UUID[]{UUID.fromString("7823C5DE-BFC9-4BC6-8E60-2280A22FED01")};
-                bluetoothAdapter.startLeScan(uuids, leScanCallback); //bluetoothAdapter.startLeScan(uuids, leScanCallback);
-
-            }
-        });
-        builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                bluetoothAdapter.startLeScan(leScanCallback);
-                dialog.cancel();
-            }
-        });
-
-        builder.show();
-
-
-
-    }
-    Context t = this;
-    @RequiresApi(M)
-    private BluetoothAdapter.LeScanCallback leScanCallback =
-            new BluetoothAdapter.LeScanCallback() {
-                @Override
-                public void onLeScan(final BluetoothDevice device, final int rssi, final byte[] scanRecord) {
-                    runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            //if(!alreadyScanned.contains(device.getAddress())){
-                                //alreadyScanned.add(device.getAddress());
-                                myDataset.add(new RecyclerData().withTitle(device.toString()).withDescription("RSSI: " + String.valueOf(rssi) + " | " + new SimpleDateFormat("HH:mm:ss.SSS").format(new Date())));
-                                mAdapter.notifyData(myDataset);
-                                //device.connectGatt(t, false, gattCallback);
-                            //}
-                        }
-                    });
-                }
-            };
-
-
     String leadingZ(int in){
         if(in < 0)
             in = 360 - Math.abs(in) ;
@@ -297,68 +216,4 @@ public class MainActivity extends AppCompatActivity {
         isAdvertising = true;
     }
 
-
-    @RequiresApi(M)
-    void advertise(){
-        AdvertisingSet currentAdvertisingSet;
-        BluetoothLeAdvertiser advertiser =
-                BluetoothAdapter.getDefaultAdapter().getBluetoothLeAdvertiser();
-
-        byte[] serviceData = UUID.randomUUID().toString().getBytes();
-        ParcelUuid uuid = ParcelUuid.fromString("7823C5DE-BFC9-4BC6-8E60-2280A22FED01");
-        AdvertiseData data = (new AdvertiseData.Builder()).setIncludeDeviceName(false).addServiceUuid(uuid).build();
-        AdvertiseSettings settings = (new AdvertiseSettings.Builder()).setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_POWER).setConnectable(true).setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_LOW).build();
-
-        AdvertiseCallback callback = new AdvertiseCallback() {
-
-        };
-        advertiser.startAdvertising(settings, data, callback);
-
-
-
-        BluetoothGattServer server = bluetoothManager.openGattServer(t, new BluetoothGattServerCallback() {
-            @Override
-            public void onCharacteristicReadRequest(BluetoothDevice device, int requestId, int offset, BluetoothGattCharacteristic characteristic){
-                myDataset.add(new RecyclerData().withDescription("@" + Calendar.getInstance().getTime().toString()).withTitle(device.getAddress()));
-                mAdapter.notifyData(myDataset);
-                device.connectGatt(t, false, gattCallback);
-            }
-        });
-
-        BluetoothGattService service = new BluetoothGattService(UUID.fromString("7823C5DE-BFC9-4BC6-8E60-2280A22FED01"), BluetoothGattService.SERVICE_TYPE_PRIMARY);
-        BluetoothGattCharacteristic characteristic = new BluetoothGattCharacteristic(UUID.randomUUID(), BluetoothGattCharacteristic.PROPERTY_READ, BluetoothGattCharacteristic.PERMISSION_READ);
-        service.addCharacteristic(characteristic);
-        server.addService(service);
-
-
-
-    }
-
-    @RequiresApi(M)
-    private BluetoothGattCallback gattCallback = new BluetoothGattCallback() {
-        @Override
-        public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
-            if(newState == BluetoothGatt.STATE_CONNECTED)
-                gatt.discoverServices();
-        }
-
-        @Override
-        public void onServicesDiscovered(final BluetoothGatt gatt, int status) {
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    for (BluetoothGattService service : gatt.getServices()) {
-                        if (service.getUuid().toString().equalsIgnoreCase("7823C5DE-BFC9-4BC6-8E60-2280A22FED01")) {
-                            gatt.readCharacteristic(service.getCharacteristics().get(0));
-                            myDataset.add(new RecyclerData().withTitle(gatt.getDevice().toString()).withDescription("UUID: " + service.getCharacteristics().get(0).getUuid()));
-                            myDataset.add(new RecyclerData().withDescription(Calendar.getInstance().getTime().toString()).withTitle(service.getCharacteristics().get(0).getUuid().toString()));
-                            mAdapter.notifyData(myDataset);
-                        }
-
-                    }
-                }
-            });
-        }
-
-    };
 }
